@@ -10,8 +10,10 @@ Fixes issues in the raw extraction output:
   2. Garbled characters — UTF-16LE decoding artifacts from script control codes
      (e.g. Latin Extended, Greek, Cyrillic characters that don't belong in
      Japanese text).
-  3. Character name extraction — some narration lines embed character names
-     in the format: 角色名「台詞」. These are split into proper fields.
+  3. Character name extraction — some lines embed character names directly
+     in the text field as: 角色名「台詞」. The script extracts the speaker
+     name to the character column and removes the surrounding 「」 brackets.
+     This overrides any existing (possibly incorrect) character column value.
   4. Empty character names — filled with "null".
 
 Usage:
@@ -172,9 +174,15 @@ def process_line(vname, cname, text):
 def fix_chara_fields(lines):
     """
     Second pass: fix character name fields.
-    - Extract character names embedded in narration text: 角色名「内容」 → split
+    - Extract character names embedded in text: 角色名「内容」 → move name to
+      character column, strip 「」 from content. This handles both empty and
+      non-empty character columns (the embedded name always takes priority).
     - Set empty character fields to 'null'
     """
+    # Build a broader pattern that also catches common mob names
+    # (e.g. ？？？, ふたり, 司会, 男子参加者１, etc.)
+    embed_pat = re.compile(r'^(.+?)「(.+)」$')
+
     fixed = []
     for line in lines:
         parts = line.split('|', 2)
@@ -184,14 +192,18 @@ def fix_chara_fields(lines):
 
         vname, cname, text = parts
 
+        # Check if text matches 角色名「台词」 pattern
+        m = embed_pat.match(text)
+        if m:
+            speaker = m.group(1).strip()
+            content = m.group(2).strip()
+            # Use the embedded speaker name, overriding the existing column
+            cname = speaker
+            text = content
+
+        # Fill empty character names with 'null'
         if cname == '':
-            # Check if text starts with 角色名「...」
-            m = re.match(r'^(' + _CHARA_PAT + r')「(.+)」$', text)
-            if m:
-                cname = m.group(1)
-                text = m.group(2)
-            else:
-                cname = 'null'
+            cname = 'null'
 
         # Remove outer 「」 from voiced dialogue (spoken lines)
         if cname not in ('', 'null') and text.startswith('「') and text.endswith('」'):

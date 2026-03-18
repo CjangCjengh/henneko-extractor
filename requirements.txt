@@ -1,4 +1,6 @@
 pycdlib>=1.14.0
 tqdm>=4.60.0
+numpy>=1.20.0
+Pillow>=9.0.0
 # HCA audio decoding (install separately):
 # pip install git+https://github.com/Youjose/PyCriCodecs.git

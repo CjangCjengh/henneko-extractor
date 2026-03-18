@@ -10,6 +10,7 @@ Extracts all dialogue lines and character voice audio from the PSP game:
 Game ISO (.iso)
   ├─ first.dat → text.dat → Name.csv (character table) + voice_list_dst.txt
   ├─ RES.DAT  → script.dat → per-chapter .obj binary scripts (dialogue records)
+  │            → script_bg.dat / script_event.dat / script_charactor*.dat → GIM images
   └─ voice.awb → AFS2 container → HCA audio files
 ```
 
@@ -21,10 +22,18 @@ output/
   │   ├─ A_K00_prologue.txt
   │   ├─ A_K01_01_01.txt
   │   └─ ...
-  └─ voice/                  # Voice audio files (.wav)
-      ├─ YOKO_0000.wav
-      ├─ TUKI_0000.wav
-      └─ ...
+  ├─ voice/                  # Voice audio files (.wav)
+  │   ├─ YOKO_0000.wav
+  │   ├─ TUKI_0000.wav
+  │   └─ ...
+  └─ images/                 # Extracted images (.png)
+      ├─ bg/                 # Backgrounds (480×272)
+      ├─ cg/                 # Event CGs (480×272)
+      ├─ sprite/             # Character bodies + face overlays
+      ├─ face/               # Standalone face sprites
+      ├─ eyecatch/           # Episode eye-catch images
+      ├─ nameplate/          # Character name plates
+      └─ item/               # Character item sprites
 ```
 
 Each `.txt` file has the format: `voice_name|character_name|dialogue_text`
@@ -41,13 +50,14 @@ TUKI_0000|月子|はい。何でしょうか
 ## Requirements
 
 ```bash
-pip install pycdlib tqdm
-pip install git+https://github.com/Youjose/PyCriCodecs.git  # HCA decoder
+pip install pycdlib tqdm numpy Pillow
+pip install git+https://github.com/Youjose/PyCriCodecs.git  # HCA decoder (optional)
 ```
 
 - **Python 3.8+**
 - `pycdlib` — ISO reading without mounting
 - `tqdm` — progress bars
+- `numpy` + `Pillow` — image decoding (GIM → PNG)
 - `PyCriCodecs` — HCA audio decoding (optional; without it, raw `.hca` files are saved)
 
 ## Usage
@@ -68,7 +78,34 @@ Options:
 
 The ISO is deleted after extraction by default to save disk space (~1.4 GB).
 
-### Step 2: Post-process dialogue scripts
+### Step 2: Extract images (BG, CG, sprites)
+
+```bash
+# From ISO directly:
+python scripts/extract_images.py --iso "path/to/game.iso" --output ./output/images
+
+# Or from an already-extracted RES.DAT file:
+python scripts/extract_images.py --res "path/to/RES.DAT" --output ./output/images
+```
+
+Options:
+| Flag | Description |
+|------|-------------|
+| `--iso` | Path to the game ISO file |
+| `--res` | Path to extracted RES.DAT file (alternative to --iso) |
+| `--output` | Output directory (default: `./output/images`) |
+| `--types` | Only extract specific types: `bg cg sprite face item nameplate eyecatch` |
+
+Examples:
+```bash
+# Extract only backgrounds and CGs:
+python scripts/extract_images.py --res RES.DAT --output ./images --types bg cg
+
+# Extract only character sprites:
+python scripts/extract_images.py --iso game.iso --output ./images --types sprite
+```
+
+### Step 3: Post-process dialogue scripts
 
 The raw extraction may produce some garbled lines due to how the binary scripts are parsed. Run the post-processor to fix them:
 
@@ -85,6 +122,35 @@ This will:
 ## Reverse Engineering Notes
 
 ### File Formats
+
+#### GIM (Graphics Image Map — PSP Texture Format)
+All image assets use PSP's native GIM format (magic: `MIG.00.1PSP`). Block-based structure:
+
+```
+[0x00]  "MIG.00.1PSP\0..."  (16 bytes, file header)
+[0x10]  Block tree:
+        Block header (16 bytes each):
+          type(u16)  unk(u16)  size(u32)  next_offset(u32)  data_offset(u32)
+        Types:
+          0x02 = Root container
+          0x03 = Image container
+          0x04 = Pixel data block
+          0x05 = Palette data block
+
+        Pixel/Palette sub-header (0x40 bytes):
+          +0x04: format(u16)  — 0x00=RGB565, 0x01=RGBA5551, 0x02=RGBA4444,
+                                 0x03=RGBA8888, 0x04=index4, 0x05=index8
+          +0x06: order(u16)   — 0=linear, 1=PSP-swizzled (16×8 tile layout)
+          +0x08: width(u16)
+          +0x0A: height(u16)
+          +0x1C: data_offset(u32) — offset from sub-header start to pixel data
+```
+
+⚠️ **Important**: The data offset must be read from sub-header `+0x1C`, NOT `+0x00`. The value at `+0x00` is a legacy/reserved field that gives incorrect results.
+
+PSP GPU textures are stored in a **swizzled** layout (16-byte × 8-row tiles) for cache efficiency. The extractor automatically detects and unswizzles based on the `order` field.
+
+Image dimensions are padded to power-of-2 for GPU compatibility (e.g., 480×272 screen → 512×272 texture). Background and CG images are automatically cropped to 480×272.
 
 #### GPDA (Generic Packed Data Archive)
 The game uses a custom archive format with the magic bytes `GPDA`. Layout:
@@ -162,3 +228,12 @@ Extracted from a complete game ISO:
 | WAV voice files | ~14,200 |
 | Voice audio size | ~2.1 GB |
 | scn text size | ~2.2 MB |
+| Background images | 222 |
+| Event CG images | 185 |
+| Character sprites | 181 (body + expressions) |
+| Face sprites | 3,439 |
+| Eye-catch images | 54 |
+
+## License
+
+This tool is for personal/research use with legally obtained game copies.
