@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Henneko PSP Game — Dialogue & Voice Extractor
-==============================================
+Henneko PSP Game — Asset Extractor
+===================================
 
 Extracts all dialogue lines (voice_name, character_name, text) and voice audio
 files from the game ISO:
@@ -16,7 +16,7 @@ Workflow:
   6. Output: scn/ folder with per-chapter .txt, voice/ folder with .wav files
 
 Usage:
-  python extract.py --iso <path_to_iso> --output <output_dir> [--keep-iso] [--keep-hca]
+  python extract.py --iso <path_to_iso> --output <output_dir> [--keep-hca]
 
 Dependencies:
   pip install pycdlib tqdm PyCriCodecs
@@ -580,7 +580,6 @@ def main():
     )
     parser.add_argument('--iso', required=True, help='Path to game ISO file')
     parser.add_argument('--output', default='./output', help='Output directory (default: ./output)')
-    parser.add_argument('--keep-iso', action='store_true', help='Do not delete the ISO after extraction')
     parser.add_argument('--keep-hca', action='store_true', help='Keep raw HCA files instead of decoding to WAV')
     args = parser.parse_args()
 
@@ -591,7 +590,7 @@ def main():
     temp_awb = os.path.join(output_dir, "_voice_temp.awb")
 
     print("=" * 60)
-    print("Henneko PSP — Dialogue & Voice Extractor")
+    print("Henneko PSP — Asset Extractor")
     print("=" * 60)
 
     if not os.path.exists(iso_path):
@@ -657,10 +656,6 @@ def main():
     # Cleanup
     if os.path.exists(temp_awb):
         os.remove(temp_awb)
-
-    if not args.keep_iso and os.path.exists(iso_path):
-        os.remove(iso_path)
-        print(f"\n  ISO deleted: {iso_path}")
 
     print("\n" + "=" * 60)
     print("Extraction complete!")

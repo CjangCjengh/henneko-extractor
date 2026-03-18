@@ -1,6 +1,6 @@
-# Henneko PSP — Dialogue & Voice Extractor
+# Henneko PSP — Asset Extractor
 
-Extracts all dialogue lines and character voice audio from the PSP game:
+Extracts dialogue scripts, character voice audio, and image assets (backgrounds, CGs, sprites) from the PSP game:
 
 > **変態王子と笑わない猫。** (Hentai Ouji to Warawanai Neko / "The Hentai Prince and the Stony Cat")
 
@@ -73,10 +73,7 @@ Options:
 |------|-------------|
 | `--iso` | Path to the game ISO file (required) |
 | `--output` | Output directory (default: `./output`) |
-| `--keep-iso` | Don't delete the ISO after extraction |
 | `--keep-hca` | Save raw HCA audio instead of decoding to WAV |
-
-The ISO is deleted after extraction by default to save disk space (~1.4 GB).
 
 ### Step 2: Extract images (BG, CG, sprites)
 
